@@ -115,6 +115,40 @@ router.get('/events', async (ctx) => {
     }
 });
 
+const getEvent = async (eventId: number) => {
+    const client = await pool.connect();
+    const eventRes = await client.query(`
+        SELECT e.id, e.name, json_agg(d.date) AS dates
+        FROM events e
+        LEFT JOIN dates d ON e.id = d.event_id
+        WHERE e.id = $1
+        GROUP BY e.id
+    `, [eventId]);
+
+    if (eventRes.rows.length === 0) {
+        return null;
+    }
+
+    const votesRes = await client.query(`
+        SELECT date, json_agg(voter_name) AS people
+        FROM votes
+        WHERE event_id = $1
+        GROUP BY date
+    `, [eventId]);
+
+    const votes: Vote[] = votesRes.rows.map(row => ({
+        date: row.date,
+        people: row.people
+    }));
+
+    return {
+        id: eventRes.rows[0].id,
+        name: eventRes.rows[0].name,
+        dates: eventRes.rows[0].dates,
+        votes: votes
+    } as Event;
+}
+
 router.get('/events/:id', async (ctx) => {
     const eventId = parseInt(ctx.params.id, 10);
     if (isNaN(eventId)) {
@@ -124,39 +158,12 @@ router.get('/events/:id', async (ctx) => {
     }
 
     try {
-        const client = await pool.connect();
-        const eventRes = await client.query(`
-            SELECT e.id, e.name, json_agg(d.date) AS dates
-            FROM events e
-            LEFT JOIN dates d ON e.id = d.event_id
-            WHERE e.id = $1
-            GROUP BY e.id
-        `, [eventId]);
-
-        if (eventRes.rows.length === 0) {
+        const event = await getEvent(eventId);
+        if (!event) {
             ctx.status = 404;
             ctx.body = { error: 'Event not found' };
             return;
         }
-
-        const votesRes = await client.query(`
-            SELECT date, json_agg(voter_name) AS people
-            FROM votes
-            WHERE event_id = $1
-            GROUP BY date
-        `, [eventId]);
-
-        const votes: Vote[] = votesRes.rows.map(row => ({
-            date: row.date,
-            people: row.people
-        }));
-
-        const event: Event = {
-            id: eventRes.rows[0].id,
-            name: eventRes.rows[0].name,
-            dates: eventRes.rows[0].dates,
-            votes: votes
-        };
 
         ctx.status = 200;
         ctx.body = event;
@@ -182,6 +189,26 @@ router.post('/events/:id/vote', async (ctx) => {
         return;
     }
 
+    const event = await getEvent(eventId);
+
+    if (!event) {
+        ctx.status = 404;
+        ctx.body = { error: 'Event not found' };
+        return;
+    }
+
+    // Convert event dates to ISO string format for comparison
+    const eventDates = event.dates.map(date => new Date(date).toISOString());
+
+    // Validate that all dates in the votes exist in the event
+    const invalidDates = votes.filter(date => !eventDates.includes(new Date(date).toISOString()));
+
+    if (invalidDates.length > 0) {
+        ctx.status = 400;
+        ctx.body = { error: `Invalid dates: ${invalidDates.join(', ')}` };
+        return;
+    }
+
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -194,32 +221,7 @@ router.post('/events/:id/vote', async (ctx) => {
         );
         await Promise.all(votePromises);
 
-        const eventRes = await client.query(`
-            SELECT e.id, e.name, json_agg(d.date) AS dates
-            FROM events e
-            LEFT JOIN dates d ON e.id = d.event_id
-            WHERE e.id = $1
-            GROUP BY e.id
-        `, [eventId]);
-
-        const votesRes = await client.query(`
-            SELECT date, json_agg(voter_name) AS people
-            FROM votes
-            WHERE event_id = $1
-            GROUP BY date
-        `, [eventId]);
-
-        const updatedVotes: Vote[] = votesRes.rows.map(row => ({
-            date: row.date,
-            people: row.people
-        }));
-
-        const updatedEvent: Event = {
-            id: eventRes.rows[0].id,
-            name: eventRes.rows[0].name,
-            dates: eventRes.rows[0].dates,
-            votes: updatedVotes
-        };
+        const updatedEvent = await getEvent(eventId);
 
         await client.query('COMMIT');
         ctx.status = 200;
