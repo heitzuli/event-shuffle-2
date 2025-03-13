@@ -1,65 +1,91 @@
-# Koa Server Project
+# Event Management Application
 
-## Description
-This project is a simple Koa server that responds with "hello world" on an HTTP GET request to the URL `/hello`.
+This is a simple event management application built with Koa, TypeScript, and PostgreSQL. The application allows you to create and list events.
 
 ## Prerequisites
-- Node.js (version 18 or later)
-- npm (Node Package Manager)
-- Docker (optional, for running the server in a Docker container)
 
-## Installation
-1. Clone the repository:
-   ```sh
-   git clone <repository-url>
-   cd <repository-directory>
-   ```
+- Docker
+- Docker Compose
+- Node.js
+- npm
 
-2. Install the dependencies:
-   ```sh
-   npm install
-   ```
+## Getting Started
 
-## Running the Server
-### Development Mode
-To run the server in development mode with TypeScript:
+### Clone the repository
+
 ```sh
+git clone https://github.com/yourusername/event-management-app.git
+cd event-management-app
+```
+
+### Set up the environment
+
+Create a `.env` file in the root directory and add the following environment variables:
+
+```env
+DATABASE_URL=postgresql://postgres:password@db:5432/mydatabase
+```
+
+### Build and run the application
+
+Use Docker Compose to build and run the application:
+
+```sh
+docker-compose up --build
+```
+
+This will start the application on `http://localhost:3000`.
+
+### API Endpoints
+
+#### Create an Event
+
+- **URL:** `/events`
+- **Method:** `POST`
+- **Content-Type:** `application/json`
+- **Body:**
+  ```json
+  {
+    "name": "Sample Event"
+  }
+  ```
+
+#### List All Events
+
+- **URL:** `/events`
+- **Method:** `GET`
+
+### Manual Tests
+
+You can use JetBrains HTTP Client to test the API endpoints. Create a file named `manual-tests/insert-event.http` with the following content:
+
+```http
+### Insert a new event
+POST http://localhost:3000/events
+Content-Type: application/json
+
+{
+  "name": "Sample Event"
+}
+```
+
+### Development
+
+To start the application in development mode, run:
+
+```sh
+npm install
 npm run dev
 ```
-The server will be running on `http://localhost:3000`.
 
-### Production Mode
-To run the server in production mode:
-1. Build the TypeScript code:
-   ```sh
-   npm run build
-   ```
+This will start the application with hot-reloading enabled.
 
-2. Start the server:
-   ```sh
-   npm start
-   ```
-The server will be running on `http://localhost:3000`.
+### Build
 
-## Running the Server in a Docker Container
-1. Build the Docker image:
-   ```sh
-   docker build -t my-koa-server .
-   ```
+To build the application, run:
 
-2. Run the Docker container:
-   ```sh
-   docker run -p 3000:3000 my-koa-server
-   ```
-The server will be running on `http://localhost:3000`.
-
-## Endpoints
-- `GET /hello`: Returns "hello world".
-
-## .gitignore
-The `.gitignore` file includes the following entries to exclude unnecessary files from the repository:
+```sh
+npm run build
 ```
-.idea
-/dist/
-/node_modules/
-```
+
+This will compile the TypeScript code to JavaScript and place it in the `dist` directory.

@@ -1,0 +1,7 @@
+### Insert a new event
+POST http://localhost:3000/events
+Content-Type: application/json
+
+{
+  "name": "Sample Event"
+}
