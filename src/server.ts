@@ -1,11 +1,19 @@
 import Koa from 'koa';
 import Router from 'koa-router';
+import { Client } from 'pg';
 
 const app = new Koa();
 const router = new Router();
 
-router.get('/hello', (ctx) => {
-    ctx.body = 'hello world';
+const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+});
+
+client.connect();
+
+router.get('/hello', async (ctx) => {
+    const res = await client.query('SELECT NOW()');
+    ctx.body = `hello world, current time: ${res.rows[0].now}`;
 });
 
 app
