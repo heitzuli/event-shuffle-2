@@ -5,14 +5,22 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@types/koa-router": "^7.4.8",
     "@types/node": "^22.13.10",
+    "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "@types/koa": "^2.15.0",
+    "koa": "^2.16.0",
+    "koa-router": "^13.0.1"
   }
 }
