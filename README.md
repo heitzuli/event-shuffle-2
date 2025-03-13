@@ -89,3 +89,11 @@ npm run build
 ```
 
 This will compile the TypeScript code to JavaScript and place it in the `dist` directory.
+
+### Project Structure
+
+- `src/`: Contains the source code
+  - `database.ts`: Database service for interacting with PostgreSQL
+  - `model.ts`: TypeScript interfaces for the data models
+  - `server.ts`: Koa server setup and route definitions
+- `manual-tests/`: HTTP request files for manual testing
