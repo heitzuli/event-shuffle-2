@@ -8,10 +8,16 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
 });
 
+interface Vote {
+    date: Date;
+    people: string[];
+}
+
 interface Event {
     id?: number;
     name: string;
     dates: Date[];
+    votes?: Vote[];
 }
 
 const app = new Koa();
@@ -31,6 +37,15 @@ const createTables = async () => {
             id SERIAL PRIMARY KEY,
             event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
             date TIMESTAMP NOT NULL
+        );
+    `);
+
+    await client.query(`
+        CREATE TABLE IF NOT EXISTS votes (
+            id SERIAL PRIMARY KEY,
+            event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+            date TIMESTAMP NOT NULL,
+            voter_name VARCHAR(255) NOT NULL
         );
     `);
 };
@@ -110,7 +125,7 @@ router.get('/events/:id', async (ctx) => {
 
     try {
         const client = await pool.connect();
-        const res = await client.query(`
+        const eventRes = await client.query(`
             SELECT e.id, e.name, json_agg(d.date) AS dates
             FROM events e
             LEFT JOIN dates d ON e.id = d.event_id
@@ -118,22 +133,104 @@ router.get('/events/:id', async (ctx) => {
             GROUP BY e.id
         `, [eventId]);
 
-        if (res.rows.length === 0) {
+        if (eventRes.rows.length === 0) {
             ctx.status = 404;
             ctx.body = { error: 'Event not found' };
-        } else {
-            const event: Event = {
-                id: res.rows[0].id,
-                name: res.rows[0].name,
-                dates: res.rows[0].dates
-            };
-            ctx.status = 200;
-            ctx.body = event;
+            return;
         }
+
+        const votesRes = await client.query(`
+            SELECT date, json_agg(voter_name) AS people
+            FROM votes
+            WHERE event_id = $1
+            GROUP BY date
+        `, [eventId]);
+
+        const votes: Vote[] = votesRes.rows.map(row => ({
+            date: row.date,
+            people: row.people
+        }));
+
+        const event: Event = {
+            id: eventRes.rows[0].id,
+            name: eventRes.rows[0].name,
+            dates: eventRes.rows[0].dates,
+            votes: votes
+        };
+
+        ctx.status = 200;
+        ctx.body = event;
     } catch (err) {
         console.error('Error retrieving event:', err);
         ctx.status = 500;
         ctx.body = { error: 'Internal server error' };
+    }
+});
+
+router.post('/events/:id/vote', async (ctx) => {
+    const eventId = parseInt(ctx.params.id, 10);
+    if (isNaN(eventId)) {
+        ctx.status = 400;
+        ctx.body = { error: 'Invalid event ID' };
+        return;
+    }
+
+    const { name, votes } = ctx.request.body as { name: string, votes: string[] };
+    if (!name || !votes || votes.length === 0) {
+        ctx.status = 400;
+        ctx.body = { error: 'Voter name and at least one vote are required' };
+        return;
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const votePromises = votes.map(date =>
+            client.query(
+                'INSERT INTO votes (event_id, date, voter_name) VALUES ($1, $2, $3)',
+                [eventId, date, name]
+            )
+        );
+        await Promise.all(votePromises);
+
+        const eventRes = await client.query(`
+            SELECT e.id, e.name, json_agg(d.date) AS dates
+            FROM events e
+            LEFT JOIN dates d ON e.id = d.event_id
+            WHERE e.id = $1
+            GROUP BY e.id
+        `, [eventId]);
+
+        const votesRes = await client.query(`
+            SELECT date, json_agg(voter_name) AS people
+            FROM votes
+            WHERE event_id = $1
+            GROUP BY date
+        `, [eventId]);
+
+        const updatedVotes: Vote[] = votesRes.rows.map(row => ({
+            date: row.date,
+            people: row.people
+        }));
+
+        const updatedEvent: Event = {
+            id: eventRes.rows[0].id,
+            name: eventRes.rows[0].name,
+            dates: eventRes.rows[0].dates,
+            votes: updatedVotes
+        };
+
+        await client.query('COMMIT');
+        ctx.status = 200;
+        ctx.body = updatedEvent;
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error adding votes:', err);
+        ctx.status = 500;
+        ctx.body = { error: 'Internal server error' };
+    } finally {
+        client.release();
     }
 });
 

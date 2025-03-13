@@ -6,3 +6,16 @@ Content-Type: application/json
   "name": "Sample Event",
   "dates": ["2020-12-31", "2021-01-01"]
 }
+
+### Add votes to an event
+POST http://localhost:3000/events/35/vote
+Content-Type: application/json
+
+{
+  "name": "Janet",
+  "votes": [
+    "2014-01-01",
+    "2014-01-05",
+    "2025-01-03"
+  ]
+}
