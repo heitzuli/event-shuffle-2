@@ -100,6 +100,43 @@ router.get('/events', async (ctx) => {
     }
 });
 
+router.get('/events/:id', async (ctx) => {
+    const eventId = parseInt(ctx.params.id, 10);
+    if (isNaN(eventId)) {
+        ctx.status = 400;
+        ctx.body = { error: 'Invalid event ID' };
+        return;
+    }
+
+    try {
+        const client = await pool.connect();
+        const res = await client.query(`
+            SELECT e.id, e.name, json_agg(d.date) AS dates
+            FROM events e
+            LEFT JOIN dates d ON e.id = d.event_id
+            WHERE e.id = $1
+            GROUP BY e.id
+        `, [eventId]);
+
+        if (res.rows.length === 0) {
+            ctx.status = 404;
+            ctx.body = { error: 'Event not found' };
+        } else {
+            const event: Event = {
+                id: res.rows[0].id,
+                name: res.rows[0].name,
+                dates: res.rows[0].dates
+            };
+            ctx.status = 200;
+            ctx.body = event;
+        }
+    } catch (err) {
+        console.error('Error retrieving event:', err);
+        ctx.status = 500;
+        ctx.body = { error: 'Internal server error' };
+    }
+});
+
 app
     .use(bodyParser())
     .use(router.routes())
