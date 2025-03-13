@@ -3,5 +3,6 @@ POST http://localhost:3000/events
 Content-Type: application/json
 
 {
-  "name": "Sample Event"
+  "name": "Sample Event",
+  "dates": ["2020-12-31", "2021-01-01"]
 }
