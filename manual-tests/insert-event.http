@@ -18,3 +18,7 @@ Content-Type: application/json
     "2021-01-01"
   ]
 }
+
+### Add votes to an event
+GET http://localhost:3000/events/35/results
+Content-Type: application/json

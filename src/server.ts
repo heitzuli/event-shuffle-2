@@ -1,7 +1,7 @@
 import Koa from 'koa';
 import Router from 'koa-router';
 import bodyParser from 'koa-bodyparser';
-import { Event } from './model';
+import {Event} from './model';
 import {databaseService} from "./database";
 
 const app = new Koa();
@@ -104,6 +104,38 @@ router.post('/events/:id/vote', async (ctx) => {
         const updatedEvent = await databaseService.getEvent(eventId);
         ctx.status = 200;
         ctx.body = updatedEvent;
+    } catch (err) {
+        ctx.status = 500;
+        ctx.body = { error: 'Internal server error' };
+    }
+});
+
+router.get('/events/:id/results', async (ctx) => {
+    const eventId = parseInt(ctx.params.id, 10);
+    if (isNaN(eventId)) {
+        ctx.status = 400;
+        ctx.body = { error: 'Invalid event ID' };
+        return;
+    }
+
+    try {
+        const event = await databaseService.getEvent(eventId);
+
+        if (!event) {
+            ctx.status = 404;
+            ctx.body = { error: 'Event not found' };
+            return;
+        }
+
+        // Filter out dates with fewer votes than the maximum
+        if (event.votes) {
+            const voteAmounts = event.votes.map(vote => vote.people.length);
+            const maxVotes = Math.max(...voteAmounts);
+            event.votes = event.votes.filter(vote => vote.people.length === maxVotes);
+        }
+
+        ctx.status = 200;
+        ctx.body = event;
     } catch (err) {
         ctx.status = 500;
         ctx.body = { error: 'Internal server error' };
